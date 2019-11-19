@@ -356,8 +356,8 @@ class Subscriptions extends Base  {
 
         'Last payment amount'=>'amount_paid',//order->payment
 
-        'Subscription start date'=>'subscription_start_date',//event
-        'Subscription end date'=>'subscription_end_date',//event
+        'Subscription start date'=>'signup_date',//event
+        'Subscription last paid'=>'last_pay',//event
     ];
 
 
