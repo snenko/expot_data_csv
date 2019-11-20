@@ -10,6 +10,7 @@ Mage::app('admin');
 
 
 
+
 class Customers{
 
     protected $customer_ids;
@@ -201,6 +202,7 @@ abstract class Base {
 
     public function __construct($params)
     {
+        $this->filename = $params['filename'];
         $this->customers = $params['customers'];
     }
 
@@ -228,8 +230,113 @@ abstract class Base {
 
     abstract public function load();
 
-    abstract public function save();
+    public function save()
+    {
+        if($this->data) {
+            $this->saveCsv($this->filename, $this->data);
+        }
+
+        return $this;
+    }
 }
+
+class CreditCard extends Base {
+
+    protected $map = [
+        'ustomer_id'=>'customer_id',
+        'Email address'=>'customer_email',
+        'Customer IP'=>'customer_ip',
+        'Profile Id'=>'profile_id',
+        'last use'=>'last_use',
+        'expires'=>'expires',
+        'cexpires year'=>'cc_exp_year',
+        'expires month'=>'cc_exp_month',
+        'last 4 digits'=>'cc_last4',
+        'type'=>'cc_type'
+    ];
+
+    protected $collection;
+
+    protected $expires_from;
+    protected $customer_ids;
+
+    public function __construct($params=null)
+    {
+        $this->customer_ids = $params['customer_ids'];
+        $this->expires_from = $params['expires_from'];
+        parent::__construct($params);
+    }
+
+    public function getCollection()
+    {
+        if(!$this->collection) {
+            $this->collection = $this->getCreditCards();
+        }
+        return $this->collection;
+    }
+
+    protected function getCreditCards()
+    {
+
+        $sql = "SELECT * FROM paradoxlabs_stored_card ";
+
+        $whereSql[] = ' active=1 ';
+
+        if($this->customer_ids) {
+            $customerIds = $this->customer_ids;
+            if(is_array($customerIds))
+                $customerIds = implode(",", $customerIds);
+
+            $whereSql[] = " customer_id in ({$customerIds}) ";
+        }
+
+        if($this->expires_from) {
+            $whereSql[] = " expires > '{$this->expires_from}' ";
+        }
+
+        if($whereSql) {
+            $sql .= "WHERE " . implode(" and ", $whereSql);
+        }
+
+        /** @var  $connection Mage_Core_Model_Resource_Resource */
+        $read = Mage::getSingleton('core/resource')->getConnection('core_read');
+
+        $items = $read->fetchAll($sql);
+        $result = new Varien_Data_Collection();
+        foreach ($items as $item) {
+
+            $additional = unserialize($items[0]['additional']) ? : null;
+            $item = $item + $additional;
+            $result->addItem(new Varien_Object($item));
+
+        }
+
+        return $result;
+    }
+
+    public function load()
+    {
+        $collection = $this->getCollection();
+
+        $data[0] = array_keys($this->map);
+
+        $row = 1;
+        foreach ($collection as $item) {
+            $col = -1;
+
+            foreach ($this->map as $fieldName=>$code) {
+
+                $data[$row][$col++] = $item->getData($code);
+            }
+            $row++;
+        }
+
+        $this->data = $data;
+
+        return $this;
+    }
+}
+
 
 
 class UserData extends Base {
@@ -254,12 +361,6 @@ class UserData extends Base {
         'VIP'=>'vip',
         'course_access'=>'course_access',
     ];
-
-    public function __construct($params)
-    {
-        $this->filename = $params['filename'];
-        parent::__construct($params);
-    }
 
     protected function getCustomrCollection()
     {
@@ -287,6 +388,7 @@ class UserData extends Base {
     public function load()
     {
         $collection = $this->getCustomrCollection();
+        $data[0] = array_keys($this->map);
 
         $row = 1;
         foreach ($collection as $item) {
@@ -324,18 +426,8 @@ class UserData extends Base {
         }
 
 
-        $data[0] = array_keys($this->map);
 
         $this->data = $data;
-
-        return $this;
-    }
-
-    public function save()
-    {
-        if($this->data) {
-            $this->saveCsv($this->filename, $this->data);
-        }
 
         return $this;
     }
@@ -372,7 +464,6 @@ class Subscriptions extends Base  {
 
     public function __construct($params)
     {
-        $this->filename = $params['filename'];
         $this->last_pay = $params['last_pay'];
         $this->sub_status = $params['sub_status'];
 
@@ -455,15 +546,6 @@ class Subscriptions extends Base  {
 
         return $this;
     }
-
-    public function save()
-    {
-        if($this->data) {
-            $this->saveCsv($this->filename, $this->data);
-        }
-
-        return $this;
-    }
 }
 
 
@@ -480,10 +562,15 @@ $customers = new Customers([
     'customer_login_DateTo' => '2019-11-30'
 ]);
 
+$creditcards = new CreditCard([
+    'filename' => 'creditcards.csv',
+    'customer_ids'=>$customers->getCustomerIds(),
+    'expires_from'=>'2019-11-20'
+]);
 
 $userData = new UserData([
         'filename' => 'user_data.csv',
-        'customers' => $customers,
+        'customers' => $customers
     ]
 );
 $subscriptions = new Subscriptions([
@@ -494,6 +581,6 @@ $subscriptions = new Subscriptions([
         'sub_status' => 'current',
     ]
 );
-
-$userData->load()->save();
-$subscriptions->load()->save();
+$creditcards->load()->save();
+//$userData->load()->save();
+//$subscriptions->load()->save();
