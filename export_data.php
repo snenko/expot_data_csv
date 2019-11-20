@@ -358,6 +358,11 @@ class Subscriptions extends Base  {
 
         'Subscription start date'=>'signup_date',//event
         'Subscription last paid'=>'last_pay',//event
+
+        'Credit card last 4 digits' => 'cc_last4',
+        'Credit card Type' => 'cc_type',
+        'Credit card expiry year' => 'cc_exp_year',
+        'Credit card expiry month' => 'cc_exp_month',
     ];
 
 
@@ -427,7 +432,7 @@ class Subscriptions extends Base  {
             foreach ($this->map as $fieldName=>$code) {
 
                 $value = null;
-                if($code=='amount_paid') {
+                if(in_array($code, ['amount_paid','cc_last4', 'cc_type', 'cc_exp_month', 'cc_exp_year'] )) {
                     $value = $order->getPayment()->getData($code);
                 }
                 elseif($code == 'customer_id') {
